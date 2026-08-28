@@ -5,8 +5,7 @@
 
 package org.pepsoft.worldpainter;
 
-import com.jidesoft.docking.*;
-import com.jidesoft.swing.JideLabel;
+import org.pepsoft.worldpainter.util.VerticalLabel;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.Nullable;
 import org.pepsoft.minecraft.Direction;
@@ -60,6 +59,10 @@ import org.pepsoft.worldpainter.tools.Eyedropper.PaintType;
 import org.pepsoft.worldpainter.tools.Eyedropper.SelectionListener;
 import org.pepsoft.worldpainter.tools.RespawnPlayerDialog;
 import org.pepsoft.worldpainter.tools.scripts.ScriptRunner;
+import org.pepsoft.worldpainter.util.docking.DockPanel;
+import org.pepsoft.worldpainter.util.docking.DockSide;
+import org.pepsoft.worldpainter.util.docking.DockingController;
+import org.pepsoft.worldpainter.util.docking.ModernDockingController;
 import org.pepsoft.worldpainter.util.*;
 import org.pepsoft.worldpainter.util.BetterAction;
 import org.pepsoft.worldpainter.util.FileFilter;
@@ -91,8 +94,6 @@ import java.util.List;
 import java.util.function.Function;
 import java.util.zip.GZIPInputStream;
 
-import static com.jidesoft.docking.DockContext.DOCK_SIDE_EAST;
-import static com.jidesoft.docking.DockContext.DOCK_SIDE_WEST;
 import static java.awt.Color.BLACK;
 import static java.awt.Color.WHITE;
 import static java.awt.GridBagConstraints.HORIZONTAL;
@@ -143,7 +144,7 @@ import static org.pepsoft.worldpainter.util.BiomeUtils.getBiomeScheme;
 @SuppressWarnings("MagicConstant")
 public final class App extends JFrame implements BrushControl,
         BiomesViewerFrame.SeedListener, BrushOptions.Listener, CustomBiomeListener,
-        DockableHolder, PropertyChangeListener, Dimension.Listener, Tile.Listener, MapDragControl {
+        PropertyChangeListener, Dimension.Listener, Tile.Listener, MapDragControl {
     private App() {
         super((mode == Mode.WORLDPAINTER) ? "WorldPainter" : "MinecraftMapEditor"); // NOI18N
 
@@ -465,7 +466,7 @@ public final class App extends JFrame implements BrushControl,
             if (layoutData == null) {
                 layoutData = new HashMap<>();
             }
-            layoutData.put(this.dimension.getId().toString(), dockingManager.getLayoutRawData());
+            layoutData.put(this.dimension.getId().toString(), dockingController.getLayoutData());
             config.setJideLayoutData(layoutData);
 
             // Remove the existing custom object layers and save the list of custom layers to the dimension to preserve
@@ -495,7 +496,7 @@ public final class App extends JFrame implements BrushControl,
                             visibleLayersChanged = true;
                         }
                     }
-                    dockingManager.removeFrame(palette.getDockableFrame().getKey());
+                    dockingController.removePanel(palette.getDockPanel().getId());
                 }
                 if (visibleLayersChanged) {
                     updateLayerVisibility();
@@ -675,10 +676,10 @@ public final class App extends JFrame implements BrushControl,
             final Map<String, byte[]> layoutData = config.getJideLayoutData();
             final String key = dimension.getId().toString();
             if ((layoutData != null) && layoutData.containsKey(key)) {
-                dockingManager.loadLayoutFrom(new ByteArrayInputStream(layoutData.get(key)));
-                // This works around a bug in JIDE that otherwise causes painting to be shifted if this resulted in
-                // resized docks:
-                view.componentResized(new ComponentEvent(view, COMPONENT_RESIZED));
+                if (dockingController.loadLayout(layoutData.get(key))) {
+                    // Make sure the view repaints correctly if this resulted in resized docks:
+                    view.componentResized(new ComponentEvent(view, COMPONENT_RESIZED));
+                }
             }
 
             if (! refreshTerrainMode()) {
@@ -1110,15 +1111,9 @@ public final class App extends JFrame implements BrushControl,
                 final String buttonPaintId = (String) button.getClientProperty(KEY_PAINT_ID);
                 if ((buttonPaintId != null) && buttonPaintId.equals(paintId)) {
                     // Make sure that the dock the button is on is showing:
-                    Component parent = button.getParent();
-                    while (parent != null) {
-                        if (parent instanceof DockableFrame) {
-                            if (! parent.isShowing()) {
-                                dockingManager.showFrame(((DockableFrame) parent).getKey());
-                            }
-                            break;
-                        }
-                        parent = parent.getParent();
+                    final String panelId = dockingController.findPanelId(button);
+                    if ((panelId != null) && (! dockingController.isPanelShowing(panelId))) {
+                        dockingController.showPanel(panelId);
                     }
                     // Make sure that the button itself is selected:
                     if (! button.isSelected()) {
@@ -1131,8 +1126,8 @@ public final class App extends JFrame implements BrushControl,
             // biomes panel
             if (paintId.startsWith("Layer/Biome/")) {
                 biomesPanel.selectBiome(Integer.parseInt(paintId.substring(12)));
-                if (! biomesPanelFrame.isShowing()) {
-                    dockingManager.showFrame("biomes");
+                if (! dockingController.isPanelShowing(biomesPanelFrame.getId())) {
+                    dockingController.showPanel(biomesPanelFrame.getId());
                 }
                 return;
             }
@@ -1839,13 +1834,6 @@ public final class App extends JFrame implements BrushControl,
         }
     }
     
-    // DockableHolder
-
-    @Override
-    public DockingManager getDockingManager() {
-        return dockingManager;
-    }
-
     // JFrame
 
     @Override
@@ -1904,7 +1892,7 @@ public final class App extends JFrame implements BrushControl,
         Terrain.setCustomMaterial(index, customMaterial);
 
         if (customTerrainPanel == null) {
-            dockingManager.addFrame(new DockableFrameBuilder(createCustomTerrainPanel(), "Custom Terrain", DOCK_SIDE_WEST, 3).withId("customTerrain").scrollable().build());
+            dockingController.addPanel(new DockableFrameBuilder(createCustomTerrainPanel(), "Custom Terrain", DockSide.WEST, 3).withId("customTerrain").scrollable().build());
         }
 
         JToggleButton newButton = createTerrainButton(Terrain.getCustomTerrain(index));
@@ -1924,7 +1912,7 @@ public final class App extends JFrame implements BrushControl,
                 paintChanged();
             };
             paintUpdater.updatePaint();
-            dockingManager.activateFrame("customTerrain");
+            dockingController.activatePanel("customTerrain");
         }
     }
 
@@ -2360,7 +2348,7 @@ public final class App extends JFrame implements BrushControl,
                         if (layoutData == null) {
                             layoutData = new HashMap<>();
                         }
-                        layoutData.put(dimension.getId().toString(), dockingManager.getLayoutRawData());
+                        layoutData.put(dimension.getId().toString(), dockingController.getLayoutData());
                         config.setJideLayoutData(layoutData);
 
                         return null;
@@ -2703,19 +2691,10 @@ public final class App extends JFrame implements BrushControl,
         // Set up docking framework
         JPanel contentContainer = new JPanel(new BorderLayout());
         getContentPane().add(contentContainer, BorderLayout.CENTER);
-        dockingManager = new DefaultDockingManager(this, contentContainer);
-        if (SystemUtils.isLinux()) {
-            // On Linux, at least in the GTK look and feel, the default
-            // (whatever it is) doesn't work; nothing is displayed
-            dockingManager.setOutlineMode(DockingManager.MIX_OUTLINE_MODE);
-        }
-        dockingManager.setGroupAllowedOnSidePane(false);
-        dockingManager.setTabbedPaneCustomizer(tabbedPane -> tabbedPane.setTabPlacement(JTabbedPane.LEFT));
-        // Stop JIDE from swallowing the Esc key
-        dockingManager.getMainContainer().unregisterKeyboardAction(getKeyStroke(VK_ESCAPE, 0));
-        Workspace workspace = dockingManager.getWorkspace();
-        workspace.setLayout(new BorderLayout());
-        workspace.add(viewContainer, BorderLayout.CENTER);
+        dockingController = new ModernDockingController(this, contentContainer);
+        // Stop the docking framework from swallowing the Esc key
+        dockingController.getMainContainer().unregisterKeyboardAction(getKeyStroke(VK_ESCAPE, 0));
+        dockingController.setWorkspaceComponent(viewContainer);
 
         setJMenuBar(createMenuBar());
         
@@ -2725,40 +2704,38 @@ public final class App extends JFrame implements BrushControl,
 
         scrollController.install();
 
-        dockingManager.addFrame(new DockableFrameBuilder(createToolPanel(), "Tools", DOCK_SIDE_WEST, 1).build());
+        dockingController.addPanel(new DockableFrameBuilder(createToolPanel(), "Tools", DockSide.WEST, 1).build());
 
-        dockingManager.addFrame(new DockableFrameBuilder(createToolSettingsPanel(), "Tool Settings", DOCK_SIDE_WEST, 2).expand().scrollable().build());
+        dockingController.addPanel(new DockableFrameBuilder(createToolSettingsPanel(), "Tool Settings", DockSide.WEST, 2).expand().scrollable().build());
 
-        dockingManager.addFrame(new DockableFrameBuilder(createLayerPanel(), "Layers", DOCK_SIDE_WEST, 3).build());
+        dockingController.addPanel(new DockableFrameBuilder(createLayerPanel(), "Layers", DockSide.WEST, 3).build());
 
-        dockingManager.addFrame(new DockableFrameBuilder(createTerrainPanel(), "Terrain", DOCK_SIDE_WEST, 3).build());
+        dockingController.addPanel(new DockableFrameBuilder(createTerrainPanel(), "Terrain", DockSide.WEST, 3).build());
 
-        biomesPanelFrame = new DockableFrameBuilder(createBiomesPanelContainer(), "Biomes", DOCK_SIDE_WEST, 3).scrollable().build();
-        dockingManager.addFrame(biomesPanelFrame);
+        biomesPanelFrame = new DockableFrameBuilder(createBiomesPanelContainer(), "Biomes", DockSide.WEST, 3).scrollable().build();
+        dockingController.addPanel(biomesPanelFrame);
 
-        dockingManager.addFrame(new DockableFrameBuilder(createAnnotationsPanel(), "Annotations", DOCK_SIDE_WEST, 3).build());
+        dockingController.addPanel(new DockableFrameBuilder(createAnnotationsPanel(), "Annotations", DockSide.WEST, 3).build());
 
-        dockingManager.addFrame(new DockableFrameBuilder(createBrushPanel(), "Brushes", DOCK_SIDE_EAST, 1).build());
+        dockingController.addPanel(new DockableFrameBuilder(createBrushPanel(), "Brushes", DockSide.EAST, 1).build());
 
         if (customBrushes.containsKey(CUSTOM_BRUSHES_DEFAULT_TITLE)) {
-            dockingManager.addFrame(new DockableFrameBuilder(createCustomBrushPanel(CUSTOM_BRUSHES_DEFAULT_TITLE, customBrushes.get(CUSTOM_BRUSHES_DEFAULT_TITLE)), "Custom Brushes", DOCK_SIDE_EAST, 1).withId("customBrushesDefault").scrollable().build());
+            dockingController.addPanel(new DockableFrameBuilder(createCustomBrushPanel(CUSTOM_BRUSHES_DEFAULT_TITLE, customBrushes.get(CUSTOM_BRUSHES_DEFAULT_TITLE)), "Custom Brushes", DockSide.EAST, 1).withId("customBrushesDefault").scrollable().build());
         }
         for (Map.Entry<String, BrushGroup> entry: customBrushes.entrySet()) {
             if (entry.getKey().equals(CUSTOM_BRUSHES_DEFAULT_TITLE)) {
                 continue;
             }
-            dockingManager.addFrame(new DockableFrameBuilder(createCustomBrushPanel(entry.getKey(), entry.getValue()), entry.getKey(), DOCK_SIDE_EAST, 1).withId("customBrushes." + entry.getKey()).scrollable().build());
+            dockingController.addPanel(new DockableFrameBuilder(createCustomBrushPanel(entry.getKey(), entry.getValue()), entry.getKey(), DockSide.EAST, 1).withId("customBrushes." + entry.getKey()).scrollable().build());
         }
         
-        dockingManager.addFrame(new DockableFrameBuilder(createBrushSettingsPanel(), "Brush Settings", DOCK_SIDE_EAST, 2).withId("brushSettings").build());
+        dockingController.addPanel(new DockableFrameBuilder(createBrushSettingsPanel(), "Brush Settings", DockSide.EAST, 2).withId("brushSettings").build());
 
         infoPanel = createInfoPanel();
-        dockingManager.addFrame(new DockableFrameBuilder(infoPanel, "Info", DOCK_SIDE_EAST, 2).withId("infoPanel").expand().withIcon(loadScaledIcon("information")).build());
+        dockingController.addPanel(new DockableFrameBuilder(infoPanel, "Info", DockSide.EAST, 2).withId("infoPanel").expand().withIcon(loadScaledIcon("information")).build());
 
-        if (config.getDefaultJideLayoutData() != null) {
-            dockingManager.loadLayoutFrom(new ByteArrayInputStream(config.getDefaultJideLayoutData()));
-        } else {
-            dockingManager.resetToDefault();
+        if (! dockingController.loadLayout(config.getDefaultJideLayoutData())) {
+            dockingController.resetToDefault();
         }
 
         MouseAdapter viewListener = new MouseAdapter() {
@@ -2822,11 +2799,11 @@ public final class App extends JFrame implements BrushControl,
 
         if (config.getShowCalloutCount() > 0) {
             BufferedImage callout = loadCallout("callout_1");
-            view.addOverlay("callout_1", 0, dockingManager.getFrame("tools"), callout);
+            view.addOverlay("callout_1", 0, dockingController.getPanelComponent("tools"), callout);
             callout = loadCallout("callout_2");
-            view.addOverlay("callout_2", -callout.getWidth(), dockingManager.getFrame("brushes"), callout);
+            view.addOverlay("callout_2", -callout.getWidth(), dockingController.getPanelComponent("brushes"), callout);
             callout = loadCallout("callout_3");
-            view.addOverlay("callout_3", 0, dockingManager.getFrame("layers"), callout);
+            view.addOverlay("callout_3", 0, dockingController.getPanelComponent("layers"), callout);
             config.setShowCalloutCount(config.getShowCalloutCount() - 1);
         }
 
@@ -3186,13 +3163,13 @@ public final class App extends JFrame implements BrushControl,
         GridBagConstraints constraints = new GridBagConstraints();
         constraints.insets = new Insets(1, 1, 1, 1);
 
-        JideLabel label = new JideLabel("Show");
+        VerticalLabel label = new VerticalLabel("Show");
         label.setOrientation(SwingConstants.VERTICAL);
         label.setClockwise(false);
         label.setMinimumSize(label.getPreferredSize());
         constraints.anchor = GridBagConstraints.SOUTH;
         layerPanel.add(label, constraints);
-        label = new JideLabel("Solo");
+        label = new VerticalLabel("Solo");
         label.setOrientation(SwingConstants.VERTICAL);
         label.setClockwise(false);
         label.setMinimumSize(label.getPreferredSize());
@@ -5310,7 +5287,7 @@ public final class App extends JFrame implements BrushControl,
         setEnabled(removeCeilingMenuItem, anchor.invert || (world.isDimensionPresent(new Anchor(anchor.dim, anchor.role, true, 0))));
         final boolean biomesSupported = (! anchor.invert) && platform.capabilities.contains(BIOMES) || platform.capabilities.contains(BIOMES_3D) || platform.capabilities.contains(NAMED_BIOMES);
         setEnabled(Biome.INSTANCE, biomesSupported, "Biomes not supported by format " + platform);
-        setEnabled(biomesPanelFrame, biomesSupported);
+        setEnabled(dockingController.getPanelComponent(biomesPanelFrame.getId()), biomesSupported);
         // TODO deselect biomes panel if it was selected
         if ((anchor.dim == DIM_NORMAL) && (anchor.role != MASTER)) {
             setEnabled(setSpawnPointToggleButton, platform.capabilities.contains(SET_SPAWN_POINT));
@@ -5470,7 +5447,7 @@ public final class App extends JFrame implements BrushControl,
             customTerrainPanel.remove(customMaterialButtons[index]);
             customMaterialButtons[index] = null;
             if (Terrain.getConfiguredCustomMaterialCount() == 0) {
-                dockingManager.removeFrame("customTerrain");
+                dockingController.removePanel("customTerrain");
                 customTerrainPanel = null;
             } else {
                 customTerrainPanel.validate();
@@ -5495,7 +5472,7 @@ public final class App extends JFrame implements BrushControl,
             while (customTerrainPanel.getComponentCount() > 1) {
                 customTerrainPanel.remove(0);
             }
-            dockingManager.removeFrame("customTerrain");
+            dockingController.removePanel("customTerrain");
             customTerrainPanel = null;
         }
     }
@@ -6588,7 +6565,7 @@ public final class App extends JFrame implements BrushControl,
         protected void performAction(ActionEvent e) {
             DesktopUtils.beep();
             if (JOptionPane.showConfirmDialog(App.this, "Are you sure you want to reset the workspace?", "Confirm Workspace Reset", YES_NO_OPTION) == YES_OPTION) {
-                dockingManager.resetToDefault();
+                dockingController.resetToDefault();
                 Configuration config = Configuration.getInstance();
                 config.setDefaultJideLayoutData(null);
                 ACTION_LOAD_LAYOUT.setEnabled(false);
@@ -6601,7 +6578,7 @@ public final class App extends JFrame implements BrushControl,
         protected void performAction(ActionEvent e) {
             DesktopUtils.beep();
             if (JOptionPane.showConfirmDialog(App.this, "Are you sure you want to reset the workspace for all worlds?", "Confirm Workspace Reset", YES_NO_OPTION) == YES_OPTION) {
-                dockingManager.resetToDefault();
+                dockingController.resetToDefault();
                 Configuration config = Configuration.getInstance();
                 config.setDefaultJideLayoutData(null);
                 config.setJideLayoutData(null);
@@ -6614,9 +6591,7 @@ public final class App extends JFrame implements BrushControl,
         @Override
         protected void performAction(ActionEvent e) {
             Configuration config = Configuration.getInstance();
-            if (config.getDefaultJideLayoutData() != null) {
-                dockingManager.loadLayoutFrom(new ByteArrayInputStream(config.getDefaultJideLayoutData()));
-            }
+            dockingController.loadLayout(config.getDefaultJideLayoutData());
         }
     };
 
@@ -6624,7 +6599,7 @@ public final class App extends JFrame implements BrushControl,
         @Override
         protected void performAction(ActionEvent e) {
             Configuration config = Configuration.getInstance();
-            config.setDefaultJideLayoutData(dockingManager.getLayoutRawData());
+            config.setDefaultJideLayoutData(dockingController.getLayoutData());
             ACTION_LOAD_LAYOUT.setEnabled(true);
             showInfo(App.this, "Workspace layout saved", "Workspace layout saved");
         }
@@ -6711,7 +6686,7 @@ public final class App extends JFrame implements BrushControl,
     final JToggleButton[] customMaterialButtons = new JToggleButton[CUSTOM_TERRAIN_COUNT];
 
     WorldPainter view;
-    DockingManager dockingManager;
+    DockingController dockingController;
     Paint paint = PaintFactory.NULL_PAINT;
     Set<Layer> hiddenLayers = new HashSet<>();
     Layer soloLayer;
@@ -6760,7 +6735,7 @@ public final class App extends JFrame implements BrushControl,
     private ThreeDeeFrame threeDeeFrame;
     private BiomesViewerFrame biomesViewerFrame;
     private BiomesPanel biomesPanel;
-    private DockableFrame biomesPanelFrame;
+    private DockPanel biomesPanelFrame;
     private Filter filter, toolFilter;
     private boolean hideAbout, hidePreferences, hideExit;
     private PaintUpdater paintUpdater = () -> {

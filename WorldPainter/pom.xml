@@ -124,7 +124,12 @@
 
         <!-- GUI dependencies -->
         <jpen.version>2-150301</jpen.version>
-        <jide.version>3.8.1</jide.version>
+        <!-- The open source subset of JIDE (Apache 2.0 / GPL), on Maven Central. Provides the plain Swing
+             controls WorldPainter uses (JideLabel, CheckBoxTree, TristateCheckBox, LookAndFeelFactory).
+             The commercial jide-common / jide-dock / jide-plaf-jdk7 artifacts are no longer used; docking
+             is provided by Modern Docking instead. -->
+        <jide-oss.version>3.6.18</jide-oss.version>
+        <modern-docking.version>1.1.2</modern-docking.version>
         <laf-dark.version>201403101706</laf-dark.version>
         <logback.version>1.2.11</logback.version>
         <log4j-to-slf4j.version>2.17.2</log4j-to-slf4j.version>
@@ -133,7 +138,7 @@
         <junit.version>4.13.2</junit.version>
 
         <!-- Build dependencies -->
-        <lombok.version>1.18.22</lombok.version>
+        <lombok.version>1.18.38</lombok.version>
 
         <!-- Maven plugin versions -->
         <maven-enforcer-plugin.version>3.3.0</maven-enforcer-plugin.version>

@@ -2,8 +2,6 @@ package org.pepsoft.worldpainter;
 
 import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.AtomicDouble;
-import com.jidesoft.docking.DockContext;
-import com.jidesoft.docking.DockableFrame;
 import org.jetbrains.annotations.NotNull;
 import org.pepsoft.minecraft.Material;
 import org.pepsoft.util.DesktopUtils;
@@ -304,12 +302,8 @@ public class CustomLayerController implements PropertyChangeListener {
                 return;
             }
             // Find out which palette the button is on
-            Container parent = addLayerButton.getParent();
-            while ((parent != null) && (! (parent instanceof DockableFrame))) {
-                parent = parent.getParent();
-            }
-            if (parent != null) {
-                final String nameKey = ((DockableFrame) parent).getKey();
+            final String nameKey = app.dockingController.findPanelId(addLayerButton);
+            if (nameKey != null) {
                 final String paletteName = nameKey.substring(nameKey.indexOf('.') + 1);
                 final JPopupMenu customLayerMenu = createCustomLayerMenu(paletteName);
                 customLayerMenu.show(addLayerButton, addLayerButton.getWidth(), 0);
@@ -332,10 +326,9 @@ public class CustomLayerController implements PropertyChangeListener {
 
         // Show the palette if it is not showing yet
         if (palette != null) {
-            app.dockingManager.addFrame(palette.getDockableFrame());
-            app.dockingManager.dockFrame(palette.getDockableFrame().getKey(), DockContext.DOCK_SIDE_WEST, 3);
+            app.dockingController.addPanel(palette.getDockPanel());
             if (activate) {
-                app.dockingManager.activateFrame(palette.getDockableFrame().getKey());
+                app.dockingController.activatePanel(palette.getDockPanel().getId());
             }
             palette.addPropertyChangeListener(this);
         } else {
@@ -369,7 +362,7 @@ public class CustomLayerController implements PropertyChangeListener {
         if (palette.isEmpty()) {
             palette.removePropertyChangeListener(this);
             paletteManager.delete(palette);
-            app.dockingManager.removeFrame(palette.getDockableFrame().getKey());
+            app.dockingController.removePanel(palette.getDockPanel().getId());
         }
     }
 
@@ -875,7 +868,7 @@ public class CustomLayerController implements PropertyChangeListener {
     private void moveLayerToPalette(CustomLayer layer, Palette destPalette) {
         Palette srcPalette = paletteManager.move(layer, destPalette);
         if (srcPalette.isEmpty()) {
-            app.dockingManager.removeFrame(srcPalette.getDockableFrame().getKey());
+            app.dockingController.removePanel(srcPalette.getDockPanel().getId());
             srcPalette.removePropertyChangeListener(this);
             paletteManager.delete(srcPalette);
         }
@@ -895,10 +888,9 @@ public class CustomLayerController implements PropertyChangeListener {
                 return;
             }
             Palette destPalette = paletteManager.create(name);
-            app.dockingManager.addFrame(destPalette.getDockableFrame());
-            app.dockingManager.dockFrame(destPalette.getDockableFrame().getKey(), DockContext.DOCK_SIDE_WEST, 3);
+            app.dockingController.addPanel(destPalette.getDockPanel());
             moveLayerToPalette(layer, destPalette);
-            app.dockingManager.activateFrame(destPalette.getDockableFrame().getKey());
+            app.dockingController.activatePanel(destPalette.getDockPanel().getId());
             destPalette.addPropertyChangeListener(this);
         }
     }
