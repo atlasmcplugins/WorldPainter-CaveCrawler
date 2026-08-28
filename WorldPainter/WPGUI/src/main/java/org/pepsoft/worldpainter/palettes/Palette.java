@@ -5,14 +5,14 @@
  */
 package org.pepsoft.worldpainter.palettes;
 
-import com.jidesoft.docking.DockContext;
-import com.jidesoft.docking.DockableFrame;
-import com.jidesoft.swing.JideLabel;
+import org.pepsoft.worldpainter.util.VerticalLabel;
 import org.jetbrains.annotations.NotNull;
 import org.pepsoft.util.IconUtils;
 import org.pepsoft.worldpainter.layers.CustomLayer;
 import org.pepsoft.worldpainter.layers.Layer;
 import org.pepsoft.worldpainter.util.DockableFrameBuilder;
+import org.pepsoft.worldpainter.util.docking.DockPanel;
+import org.pepsoft.worldpainter.util.docking.DockSide;
 import org.pepsoft.worldpainter.util.LayoutUtils;
 
 import javax.swing.*;
@@ -41,13 +41,13 @@ public class Palette {
         // Row: Show/Solo labels
         GridBagConstraints constraints = new GridBagConstraints();
         constraints.insets = new Insets(1, 1, 1, 1);
-        JideLabel label = new JideLabel("Show");
+        VerticalLabel label = new VerticalLabel("Show");
         label.setOrientation(SwingConstants.VERTICAL);
         label.setClockwise(false);
         label.setMinimumSize(label.getPreferredSize());
         constraints.anchor = GridBagConstraints.SOUTH;
         panel.add(label, constraints);
-        label = new JideLabel("Solo");
+        label = new VerticalLabel("Solo");
         label.setOrientation(SwingConstants.VERTICAL);
         label.setClockwise(false);
         label.setMinimumSize(label.getPreferredSize());
@@ -76,8 +76,8 @@ public class Palette {
         // Row: components provided to constructor
         LayoutUtils.addRowOfComponents(panel, constraints, buttonComponents);
 
-        dockableFrame = new DockableFrameBuilder(panel, name, DockContext.DOCK_SIDE_WEST, 3).withIcon(ICON_LAYERS).scrollable().build();
-        dockableFrame.setKey("customLayerPalette." + name);
+        dockPanel = new DockableFrameBuilder(panel, name, DockSide.WEST, 3).withIcon(ICON_LAYERS).scrollable().build();
+        dockPanel.setId("customLayerPalette." + name);
     }
 
     public String getName() {
@@ -89,9 +89,8 @@ public class Palette {
         for (CustomLayer layer: layers) {
             layer.setPalette(name);
         }
-        dockableFrame.setTitle(name);
-        dockableFrame.setTabTitle(name);
-        dockableFrame.setKey("customLayerPalette." + name);
+        dockPanel.setTitle(name);
+        dockPanel.setId("customLayerPalette." + name);
     }
 
     public List<CustomLayer> getLayers() {
@@ -106,7 +105,7 @@ public class Palette {
         this.show = show;
         showCheckBox.setSelected(show);
         propertyChangeSupport.firePropertyChange("show", ! showCheckBox.isSelected(), showCheckBox.isSelected());
-        dockableFrame.setFrameIcon(solo ? ICON_SOLO : (show ? ICON_LAYERS : ICON_NOT_SHOWN));
+        dockPanel.setIcon(solo ? ICON_SOLO : (show ? ICON_LAYERS : ICON_NOT_SHOWN));
     }
 
     public boolean isSolo() {
@@ -117,7 +116,7 @@ public class Palette {
         this.solo = solo;
         soloCheckBox.setSelected(solo);
         propertyChangeSupport.firePropertyChange("solo", ! soloCheckBox.isSelected(), soloCheckBox.isSelected());
-        dockableFrame.setFrameIcon(solo ? ICON_SOLO : (show ? ICON_LAYERS : ICON_NOT_SHOWN));
+        dockPanel.setIcon(solo ? ICON_SOLO : (show ? ICON_LAYERS : ICON_NOT_SHOWN));
     }
 
     @SuppressWarnings("element-type-mismatch")
@@ -125,8 +124,8 @@ public class Palette {
         return layers.contains(layer);
     }
 
-    public DockableFrame getDockableFrame() {
-        return dockableFrame;
+    public DockPanel getDockPanel() {
+        return dockPanel;
     }
 
     public void addPropertyChangeListener(PropertyChangeListener listener) {
@@ -175,7 +174,7 @@ public class Palette {
     }
     
     private void editPalette(ActionEvent event) {
-        final EditPaletteDialog dialog = new EditPaletteDialog(getWindowAncestor(dockableFrame), paletteManager, this);
+        final EditPaletteDialog dialog = new EditPaletteDialog(getWindowAncestor(dockPanel.getContent()), paletteManager, this);
         dialog.setVisible(true);
     }
 
@@ -196,7 +195,7 @@ public class Palette {
     private final JPanel panel;
     private final List<CustomLayer> layers = new ArrayList<>();
     private final Map<CustomLayer, List<Component>> layerButtonComponents = new HashMap<>();
-    private final DockableFrame dockableFrame;
+    private final DockPanel dockPanel;
     private final JCheckBox showCheckBox, soloCheckBox;
     private final PaletteManager paletteManager;
     private final PropertyChangeSupport propertyChangeSupport = new PropertyChangeSupport(this);

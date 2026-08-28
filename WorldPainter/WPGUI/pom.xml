@@ -41,35 +41,22 @@
             <artifactId>jpen</artifactId>
             <version>${jpen.version}</version>
         </dependency>
-        <!-- If you can't or won't use the JIDE docking framework, you can use the JIDE open source components so that
-             at least the derived Swing controls will work: -->
-        <!--<dependency>-->
-            <!--<groupId>com.jidesoft</groupId>-->
-            <!--<artifactId>jide-oss</artifactId>-->
-            <!--<version>${jide.version}</version>-->
-        <!--</dependency>-->
         <dependency>
-            <!-- Commercial product; you will need to download the evaluation version, or obtain a license to use JIDE
-                 (an open source license is free). -->
+            <!-- The open source subset of JIDE, available from Maven Central. Supplies the plain Swing controls
+                 WorldPainter derives from: JideLabel, CheckBoxTree, TristateCheckBox/TristateButtonModel and
+                 LookAndFeelFactory. Note it does NOT contain com.jidesoft.utils.Lm (the commercial licence
+                 manager) or the docking framework. -->
             <groupId>com.jidesoft</groupId>
-            <artifactId>jide-common</artifactId>
-            <version>${jide.version}</version>
+            <artifactId>jide-oss</artifactId>
+            <version>${jide-oss.version}</version>
         </dependency>
         <dependency>
-            <!-- Commercial product; you will need to download the evaluation version, or obtain a license to use JIDE
-                 (an open source license is free). -->
-            <groupId>com.jidesoft</groupId>
-            <artifactId>jide-dock</artifactId>
-            <version>${jide.version}</version>
-        </dependency>
-        <dependency>
-            <!-- Commercial product; you will need to download the evaluation version, or obtain a license to use JIDE
-                 (an open source license is free). This module is only necessary on Linux, to make the GTK look and feel
-                 work correctly. -->
-            <groupId>com.jidesoft</groupId>
-            <artifactId>jide-plaf-jdk7</artifactId>
-            <version>${jide.version}</version>
-            <scope>runtime</scope>
+            <!-- Apache 2.0 replacement for the commercial JIDE Docking Framework. Has no transitive
+                 dependencies. Used only through org.pepsoft.worldpainter.util.docking. The multi-app variant is used because it
+                 exposes an instance API, including stream based layout persistence. -->
+            <groupId>io.github.andrewauclair</groupId>
+            <artifactId>modern-docking-multi-app</artifactId>
+            <version>${modern-docking.version}</version>
         </dependency>
         <dependency>
             <!-- Not in Maven central; here it comes from the worldpainter-private repo. -->
